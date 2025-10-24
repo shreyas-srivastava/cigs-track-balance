@@ -10,6 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -39,6 +49,8 @@ const Index = () => {
     personName: string;
   }>({ open: false, personId: null, personName: "" });
   const [globalPrice, setGlobalPrice] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [personToDelete, setPersonToDelete] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -303,6 +315,61 @@ const Index = () => {
     },
   });
 
+  // Delete person mutation
+  const deletePersonMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("people")
+        .update({ is_active: false })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["people-financials"] });
+      const previousPeople = queryClient.getQueryData(["people-financials"]);
+
+      queryClient.setQueryData(
+        ["people-financials"],
+        (old: PersonFinancials[] | undefined) =>
+          old?.filter((p) => p.id !== id) || []
+      );
+
+      return { previousPeople };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+      queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
+      toast({
+        title: "Success",
+        description: "Person deleted",
+      });
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previousPeople) {
+        queryClient.setQueryData(["people-financials"], context.previousPeople);
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete person",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeletePerson = (id: string, name: string) => {
+    setPersonToDelete({ id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (personToDelete) {
+      deletePersonMutation.mutate(personToDelete.id);
+      setDeleteDialogOpen(false);
+      setPersonToDelete(null);
+    }
+  };
+
   const filteredPeople = people.filter((person) =>
     person.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -424,6 +491,7 @@ const Index = () => {
                   setHistoryDrawer({ open: true, personId: id, personName: name })
                 }
                 onNameClick={(id) => navigate(`/person/${id}`)}
+                onDelete={handleDeletePerson}
               />
             ))}
           </div>
@@ -438,6 +506,27 @@ const Index = () => {
           personId={historyDrawer.personId}
           personName={historyDrawer.personName}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Person</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {personToDelete?.name}? This will hide their record and all associated history.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDelete} 
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Minus, Plus, History } from "lucide-react";
+import { Minus, Plus, History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ interface PersonCardProps {
   onPriceUpdate: (id: string, price: number | null) => void;
   onOpenHistory: (id: string, name: string) => void;
   onNameClick: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
   defaultPrice: number;
 }
 
@@ -30,6 +31,7 @@ export function PersonCard({
   onPriceUpdate,
   onOpenHistory,
   onNameClick,
+  onDelete,
   defaultPrice,
 }: PersonCardProps) {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
@@ -143,6 +145,14 @@ export function PersonCard({
             className="h-9 w-9"
           >
             <History className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onDelete(person.id, person.name)}
+            className="h-9 w-9 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
