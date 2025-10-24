@@ -10,13 +10,16 @@ interface PersonCardProps {
     id: string;
     name: string;
     price_per_cig: number | null;
-    count: number;
-    total: number;
+    cig_count: number;
+    cig_total: number;
+    loans_total: number;
+    grand_total: number;
   };
   onIncrement: (id: string) => void;
   onDecrement: (id: string) => void;
   onPriceUpdate: (id: string, price: number | null) => void;
   onOpenHistory: (id: string, name: string) => void;
+  onNameClick: (id: string) => void;
   defaultPrice: number;
 }
 
@@ -26,6 +29,7 @@ export function PersonCard({
   onDecrement,
   onPriceUpdate,
   onOpenHistory,
+  onNameClick,
   defaultPrice,
 }: PersonCardProps) {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
@@ -47,7 +51,12 @@ export function PersonCard({
     <Card className="p-4 animate-slide-up hover:shadow-md transition-smooth">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-lg truncate">{person.name}</h3>
+          <button
+            onClick={() => onNameClick(person.id)}
+            className="font-semibold text-lg truncate hover:text-primary transition-colors text-left w-full"
+          >
+            {person.name}
+          </button>
           <div className="flex items-center gap-2 mt-1">
             {isEditingPrice ? (
               <div className="flex items-center gap-1">
@@ -83,13 +92,28 @@ export function PersonCard({
 
         <div className="flex items-center gap-3">
           <div className="text-center">
-            <div className="number-emphasis">{person.count}</div>
+            <div className="number-emphasis">{person.cig_count}</div>
             <div className="text-xs text-muted-foreground">pcs</div>
           </div>
 
           <div className="text-right">
+            <div className="text-sm text-muted-foreground">Cigs</div>
             <div className="currency-display text-primary">
-              {formatCurrency(person.total)}
+              {formatCurrency(person.cig_total)}
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">Loans</div>
+            <div className="currency-display text-accent">
+              {formatCurrency(person.loans_total)}
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-sm font-semibold text-muted-foreground">Total</div>
+            <div className="currency-display text-lg font-bold text-foreground">
+              {formatCurrency(person.grand_total)}
             </div>
           </div>
         </div>
@@ -99,7 +123,7 @@ export function PersonCard({
             size="icon"
             variant="outline"
             onClick={() => onDecrement(person.id)}
-            disabled={person.count <= 0}
+            disabled={person.cig_count <= 0}
             className="h-9 w-9 hover-lift"
           >
             <Minus className="h-4 w-4" />

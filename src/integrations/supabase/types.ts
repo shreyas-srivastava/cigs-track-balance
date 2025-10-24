@@ -19,18 +19,21 @@ export type Database = {
           created_at: string | null
           delta: number
           id: string
+          is_deleted: boolean
           person_id: string
         }
         Insert: {
           created_at?: string | null
           delta: number
           id?: string
+          is_deleted?: boolean
           person_id: string
         }
         Update: {
           created_at?: string | null
           delta?: number
           id?: string
+          is_deleted?: boolean
           person_id?: string
         }
         Relationships: [
@@ -45,7 +48,52 @@ export type Database = {
             foreignKeyName: "events_person_id_fkey"
             columns: ["person_id"]
             isOneToOne: false
-            referencedRelation: "v_person_totals"
+            referencedRelation: "v_person_financials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          is_deleted: boolean
+          loan_date: string
+          person_id: string
+          reason: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          loan_date?: string
+          person_id: string
+          reason?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          loan_date?: string
+          person_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "v_person_financials"
             referencedColumns: ["id"]
           },
         ]
@@ -94,15 +142,24 @@ export type Database = {
       }
     }
     Views: {
-      v_person_totals: {
+      v_global_receivable: {
         Row: {
-          count: number | null
+          total_receivable: number | null
+        }
+        Relationships: []
+      }
+      v_person_financials: {
+        Row: {
+          cig_count: number | null
+          cig_total: number | null
           created_at: string | null
+          eff_price_per_cig: number | null
+          grand_total: number | null
           id: string | null
           is_active: boolean | null
+          loans_total: number | null
           name: string | null
           price_per_cig: number | null
-          total: number | null
         }
         Relationships: []
       }

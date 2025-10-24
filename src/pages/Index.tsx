@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search, Settings } from "lucide-react";
+import { Search, Settings, TrendingUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PersonCard } from "@/components/PersonCard";
@@ -14,18 +15,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/currency";
 
-interface PersonTotal {
+interface PersonFinancials {
   id: string;
   name: string;
   price_per_cig: number | null;
   is_active: boolean;
   created_at: string;
-  count: number;
-  total: number;
+  cig_count: number;
+  eff_price_per_cig: number;
+  cig_total: number;
+  loans_total: number;
+  grand_total: number;
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [historyDrawer, setHistoryDrawer] = useState<{
     open: boolean;
@@ -57,18 +63,32 @@ const Index = () => {
     }
   }, [settings]);
 
-  // Fetch people with totals
+  // Fetch people with financials
   const { data: people = [], isLoading } = useQuery({
-    queryKey: ["people-totals"],
+    queryKey: ["people-financials"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("v_person_totals")
+        .from("v_person_financials")
         .select("*")
         .eq("is_active", true)
         .order("name");
 
       if (error) throw error;
-      return data as PersonTotal[];
+      return data as PersonFinancials[];
+    },
+  });
+
+  // Fetch global receivable
+  const { data: globalReceivable } = useQuery({
+    queryKey: ["global-receivable"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_global_receivable")
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      return data as { total_receivable: number };
     },
   });
 
@@ -84,7 +104,8 @@ const Index = () => {
           table: "people",
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["people-totals"] });
+          queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+          queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
         }
       )
       .subscribe();
@@ -99,7 +120,8 @@ const Index = () => {
           table: "events",
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["people-totals"] });
+          queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+          queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
         }
       )
       .subscribe();
@@ -157,18 +179,22 @@ const Index = () => {
       if (error) throw error;
     },
     onMutate: async (personId) => {
-      await queryClient.cancelQueries({ queryKey: ["people-totals"] });
-      const previousPeople = queryClient.getQueryData(["people-totals"]);
+      await queryClient.cancelQueries({ queryKey: ["people-financials"] });
+      const previousPeople = queryClient.getQueryData(["people-financials"]);
 
-      queryClient.setQueryData(["people-totals"], (old: PersonTotal[]) =>
+      queryClient.setQueryData(["people-financials"], (old: PersonFinancials[]) =>
         old.map((person) =>
           person.id === personId
             ? {
                 ...person,
-                count: person.count + 1,
-                total:
-                  (person.count + 1) *
+                cig_count: person.cig_count + 1,
+                cig_total:
+                  (person.cig_count + 1) *
                   (person.price_per_cig ?? settings?.default_price ?? 12),
+                grand_total:
+                  (person.cig_count + 1) *
+                  (person.price_per_cig ?? settings?.default_price ?? 12) +
+                  person.loans_total,
               }
             : person
         )
@@ -178,7 +204,7 @@ const Index = () => {
     },
     onError: (error, variables, context) => {
       if (context?.previousPeople) {
-        queryClient.setQueryData(["people-totals"], context.previousPeople);
+        queryClient.setQueryData(["people-financials"], context.previousPeople);
       }
       toast({
         title: "Error",
@@ -199,18 +225,22 @@ const Index = () => {
       if (error) throw error;
     },
     onMutate: async (personId) => {
-      await queryClient.cancelQueries({ queryKey: ["people-totals"] });
-      const previousPeople = queryClient.getQueryData(["people-totals"]);
+      await queryClient.cancelQueries({ queryKey: ["people-financials"] });
+      const previousPeople = queryClient.getQueryData(["people-financials"]);
 
-      queryClient.setQueryData(["people-totals"], (old: PersonTotal[]) =>
+      queryClient.setQueryData(["people-financials"], (old: PersonFinancials[]) =>
         old.map((person) =>
-          person.id === personId && person.count > 0
+          person.id === personId && person.cig_count > 0
             ? {
                 ...person,
-                count: person.count - 1,
-                total:
-                  (person.count - 1) *
+                cig_count: person.cig_count - 1,
+                cig_total:
+                  (person.cig_count - 1) *
                   (person.price_per_cig ?? settings?.default_price ?? 12),
+                grand_total:
+                  (person.cig_count - 1) *
+                  (person.price_per_cig ?? settings?.default_price ?? 12) +
+                  person.loans_total,
               }
             : person
         )
@@ -220,7 +250,7 @@ const Index = () => {
     },
     onError: (error, variables, context) => {
       if (context?.previousPeople) {
-        queryClient.setQueryData(["people-totals"], context.previousPeople);
+        queryClient.setQueryData(["people-financials"], context.previousPeople);
       }
       toast({
         title: "Error",
@@ -247,7 +277,8 @@ const Index = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["people-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+      queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
     },
   });
 
@@ -263,7 +294,8 @@ const Index = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
-      queryClient.invalidateQueries({ queryKey: ["people-totals"] });
+      queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+      queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
       toast({
         title: "Success",
         description: "Global price updated",
@@ -287,6 +319,21 @@ const Index = () => {
             Track cigarette usage and amounts owed
           </p>
         </div>
+
+        {/* Total Receivable Pill */}
+        {globalReceivable && (
+          <div className="mb-6 flex justify-end">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Total Getting Back:
+              </span>
+              <span className="text-lg font-bold text-primary">
+                {formatCurrency(globalReceivable.total_receivable)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -376,6 +423,7 @@ const Index = () => {
                 onOpenHistory={(id, name) =>
                   setHistoryDrawer({ open: true, personId: id, personName: name })
                 }
+                onNameClick={(id) => navigate(`/person/${id}`)}
               />
             ))}
           </div>
