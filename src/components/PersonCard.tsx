@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Minus, Plus, History, Trash2 } from "lucide-react";
+import { Minus, Plus, Edit2, Check, IndianRupee, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/currency";
 
 interface PersonCardProps {
@@ -11,6 +12,7 @@ interface PersonCardProps {
     name: string;
     price_per_cig: number | null;
     cig_count: number;
+    eff_price_per_cig: number;
     cig_total: number;
     loans_total: number;
     grand_total: number;
@@ -18,7 +20,6 @@ interface PersonCardProps {
   onIncrement: (id: string) => void;
   onDecrement: (id: string) => void;
   onPriceUpdate: (id: string, price: number | null) => void;
-  onOpenHistory: (id: string, name: string) => void;
   onNameClick: (id: string) => void;
   onDelete: (id: string, name: string) => void;
   defaultPrice: number;
@@ -29,20 +30,22 @@ export function PersonCard({
   onIncrement,
   onDecrement,
   onPriceUpdate,
-  onOpenHistory,
   onNameClick,
   onDelete,
-  defaultPrice,
 }: PersonCardProps) {
   const [isEditingPrice, setIsEditingPrice] = useState(false);
-  const [priceInput, setPriceInput] = useState(
+  const [editPrice, setEditPrice] = useState(
     person.price_per_cig?.toString() || ""
   );
 
-  const effectivePrice = person.price_per_cig ?? defaultPrice;
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditingPrice(true);
+  };
 
-  const handlePriceSave = () => {
-    const newPrice = priceInput === "" ? null : parseFloat(priceInput);
+  const handleSavePrice = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newPrice = editPrice === "" ? null : parseFloat(editPrice);
     if (newPrice === null || !isNaN(newPrice)) {
       onPriceUpdate(person.id, newPrice);
       setIsEditingPrice(false);
@@ -50,112 +53,106 @@ export function PersonCard({
   };
 
   return (
-    <Card className="p-4 animate-slide-up hover:shadow-md transition-smooth">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <button
-            onClick={() => onNameClick(person.id)}
-            className="font-semibold text-lg truncate hover:text-primary transition-colors text-left w-full"
-          >
-            {person.name}
-          </button>
-          <div className="flex items-center gap-2 mt-1">
-            {isEditingPrice ? (
-              <div className="flex items-center gap-1">
-                <span className="text-sm text-muted-foreground">₹</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={priceInput}
-                  onChange={(e) => setPriceInput(e.target.value)}
-                  onBlur={handlePriceSave}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handlePriceSave();
-                    if (e.key === "Escape") {
-                      setIsEditingPrice(false);
-                      setPriceInput(person.price_per_cig?.toString() || "");
-                    }
-                  }}
-                  className="w-20 h-7 text-sm"
-                  autoFocus
-                />
+    <Card className="group relative overflow-hidden hover-lift cursor-pointer border-2 transition-all duration-300 hover:border-primary/50" onClick={() => onNameClick(person.id)}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl -z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
+      
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-2xl font-heading truncate group-hover:text-primary transition-colors">
+              {person.name}
+            </CardTitle>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center">
+                <IndianRupee className="h-3 w-3 text-primary" />
               </div>
-            ) : (
-              <button
-                onClick={() => setIsEditingPrice(true)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                ₹{effectivePrice.toFixed(2)}/pc
-                {person.price_per_cig === null && " (default)"}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-center">
-            <div className="number-emphasis">{person.cig_count}</div>
-            <div className="text-xs text-muted-foreground">pcs</div>
-          </div>
-
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground">Cigs</div>
-            <div className="currency-display text-primary">
-              {formatCurrency(person.cig_total)}
+              {isEditingPrice ? (
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <Input
+                    type="number"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    className="h-8 w-24 font-medium"
+                    step="0.01"
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={handleSavePrice} className="h-8 px-3">
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleEditClick}
+                  className="font-medium hover:text-primary transition-colors flex items-center gap-1.5"
+                >
+                  {formatCurrency(person.eff_price_per_cig)}/pc
+                  <Edit2 className="h-3 w-3" />
+                </button>
+              )}
             </div>
           </div>
-
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground">Loans</div>
-            <div className="currency-display text-accent">
-              {formatCurrency(person.loans_total)}
-            </div>
-          </div>
-
-          <div className="text-right">
-            <div className="text-sm font-semibold text-muted-foreground">Total</div>
-            <div className="currency-display text-lg font-bold text-foreground">
-              {formatCurrency(person.grand_total)}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
           <Button
-            size="icon"
-            variant="outline"
-            onClick={() => onDecrement(person.id)}
-            disabled={person.cig_count <= 0}
-            className="h-9 w-9 hover-lift"
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="default"
-            onClick={() => onIncrement(person.id)}
-            className="h-9 w-9 hover-lift"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
             variant="ghost"
-            onClick={() => onOpenHistory(person.id, person.name)}
-            className="h-9 w-9"
-          >
-            <History className="h-4 w-4" />
-          </Button>
-          <Button
             size="icon"
-            variant="ghost"
-            onClick={() => onDelete(person.id, person.name)}
-            className="h-9 w-9 text-destructive hover:text-destructive"
+            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(person.id, person.name);
+            }}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        {/* Count Display */}
+        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
+          <span className="text-sm font-medium text-muted-foreground">Cigarette Count</span>
+          <span className="text-3xl font-heading font-bold tabular-nums">{person.cig_count}</span>
+        </div>
+
+        {/* Financial Breakdown */}
+        <div className="space-y-3 bg-gradient-to-br from-muted/30 to-muted/10 p-4 rounded-xl">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Cigarettes</span>
+            <span className="font-semibold tabular-nums">{formatCurrency(person.cig_total)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Loans</span>
+            <span className="font-semibold tabular-nums">{formatCurrency(person.loans_total)}</span>
+          </div>
+          <Separator className="my-2" />
+          <div className="flex justify-between items-center">
+            <span className="font-semibold">Grand Total</span>
+            <span className="text-2xl font-heading font-bold text-primary tabular-nums">
+              {formatCurrency(person.grand_total)}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 pt-2" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1 h-12 border-2 hover:border-destructive hover:text-destructive transition-all"
+            onClick={() => onDecrement(person.id)}
+            disabled={person.cig_count <= 0}
+          >
+            <Minus className="h-5 w-5 mr-1" />
+            Remove
+          </Button>
+          <Button
+            size="lg"
+            className="flex-1 h-12 shadow-md hover:shadow-lg transition-all"
+            onClick={() => onIncrement(person.id)}
+          >
+            <Plus className="h-5 w-5 mr-1" />
+            Add
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   );
 }

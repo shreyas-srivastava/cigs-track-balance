@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import { Search, Settings, TrendingUp } from "lucide-react";
+import { Search, Settings as SettingsIcon, TrendingUp, Users, IndianRupee, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PersonCard } from "@/components/PersonCard";
 import { AddPersonDialog } from "@/components/AddPersonDialog";
-import { HistoryDrawer } from "@/components/HistoryDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -19,11 +17,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/currency";
 
@@ -43,11 +36,6 @@ interface PersonFinancials {
 const Index = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [historyDrawer, setHistoryDrawer] = useState<{
-    open: boolean;
-    personId: string | null;
-    personName: string;
-  }>({ open: false, personId: null, personName: "" });
   const [globalPrice, setGlobalPrice] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [personToDelete, setPersonToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -375,108 +363,153 @@ const Index = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-7xl mx-auto px-4 py-8 md:px-8 md:py-12">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">
-            The new Mamu
-          </h1>
-          <p className="text-muted-foreground">
-            Track cigarette usage and amounts owed
-          </p>
-        </div>
-
-        {/* Total Receivable Pill */}
-        {globalReceivable && (
-          <div className="mb-6 flex justify-end">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <span className="text-sm font-medium text-muted-foreground">
-                Total Getting Back:
-              </span>
-              <span className="text-lg font-bold text-primary">
-                {formatCurrency(globalReceivable.total_receivable)}
-              </span>
+        <div className="mb-10 space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="space-y-2">
+              <h1 className="text-5xl md:text-6xl font-heading font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                Mamu
+              </h1>
+              <p className="text-lg text-muted-foreground">Track cigarettes and manage loans with ease</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3">
+              <AddPersonDialog
+                onAdd={async (name, priceOverride) => {
+                  await addPersonMutation.mutateAsync({ name, priceOverride });
+                }}
+                defaultPrice={settings?.default_price ?? 12}
+              />
             </div>
           </div>
-        )}
 
-        {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <AddPersonDialog
-            onAdd={async (name, priceOverride) => {
-              await addPersonMutation.mutateAsync({ name, priceOverride });
-            }}
-            defaultPrice={settings?.default_price ?? 12}
-          />
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Global Price
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Default Price</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Set the default price per cigarette
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Total Getting Back */}
+            <div className="stat-card bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Getting Back</p>
+                  <p className="text-3xl font-heading font-bold text-primary tabular-nums">
+                    {formatCurrency(globalReceivable?.total_receivable || 0)}
                   </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="global-price">Price (₹)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="global-price"
-                      type="number"
-                      step="0.01"
-                      value={globalPrice}
-                      onChange={(e) => setGlobalPrice(e.target.value)}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        const price = parseFloat(globalPrice);
-                        if (!isNaN(price)) {
-                          updateGlobalPriceMutation.mutate(price);
-                        }
-                      }}
-                    >
-                      Save
-                    </Button>
-                  </div>
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-primary" />
                 </div>
               </div>
-            </PopoverContent>
-          </Popover>
+            </div>
 
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+            {/* Active Customers */}
+            <div className="stat-card bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Active Customers</p>
+                  <p className="text-3xl font-heading font-bold text-foreground tabular-nums">
+                    {filteredPeople.length}
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-accent" />
+                </div>
+              </div>
+            </div>
+
+            {/* Default Price */}
+            <div className="stat-card bg-gradient-to-br from-success/10 to-success/5 border-success/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Default Price</p>
+                  <p className="text-3xl font-heading font-bold text-foreground tabular-nums">
+                    {formatCurrency(settings?.default_price || 0)}
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
+                  <IndianRupee className="h-6 w-6 text-success" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* People List */}
+        {/* Search and Settings */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-8">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+            <Input
+              type="text"
+              placeholder="Search customers by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-12 h-12 text-base border-2 focus:border-primary rounded-xl"
+            />
+          </div>
+          
+          <div className="flex gap-3 items-center bg-card p-4 rounded-xl border-2 shadow-sm">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <SettingsIcon className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-muted-foreground">Default Price</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={globalPrice}
+                    onChange={(e) => setGlobalPrice(e.target.value)}
+                    className="w-24 h-9 font-semibold"
+                    step="0.01"
+                  />
+                  <Button 
+                    size="sm"
+                    onClick={() => {
+                      const price = parseFloat(globalPrice);
+                      if (!isNaN(price)) {
+                        updateGlobalPriceMutation.mutate(price);
+                      }
+                    }}
+                    disabled={updateGlobalPriceMutation.isPending}
+                    className="h-9"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* People Grid */}
         {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">
-            Loading...
+          <div className="text-center py-20">
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+            <p className="text-muted-foreground">Loading customers...</p>
           </div>
         ) : filteredPeople.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {searchQuery
-              ? "No people found matching your search"
-              : "No people added yet. Click 'Add Person' to get started."}
+          <div className="text-center py-20">
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
+              <Users className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-heading font-semibold mb-2">No customers yet</h3>
+            <p className="text-muted-foreground mb-6">
+              {searchQuery ? "No customers match your search" : "Add your first customer to start tracking"}
+            </p>
+            {!searchQuery && (
+              <AddPersonDialog
+                onAdd={async (name, priceOverride) => {
+                  await addPersonMutation.mutateAsync({ name, priceOverride });
+                }}
+                defaultPrice={settings?.default_price ?? 12}
+              />
+            )}
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {filteredPeople.map((person) => (
               <PersonCard
                 key={person.id}
@@ -487,25 +520,12 @@ const Index = () => {
                 onPriceUpdate={(id, price) =>
                   updatePriceMutation.mutate({ personId: id, price })
                 }
-                onOpenHistory={(id, name) =>
-                  setHistoryDrawer({ open: true, personId: id, personName: name })
-                }
                 onNameClick={(id) => navigate(`/person/${id}`)}
                 onDelete={handleDeletePerson}
               />
             ))}
           </div>
         )}
-
-        {/* History Drawer */}
-        <HistoryDrawer
-          open={historyDrawer.open}
-          onClose={() =>
-            setHistoryDrawer({ open: false, personId: null, personName: "" })
-          }
-          personId={historyDrawer.personId}
-          personName={historyDrawer.personName}
-        />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
