@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { Lock, AlertCircle, Download, Eye, EyeOff } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,23 +63,29 @@ export default function SharedViewPage() {
     setIsSubmitting(true);
 
     try {
-      const { data: responseData, error: invokeError } = await supabase.functions.invoke(
-        "validate-share-token",
+      // Use direct fetch for better control over non-2xx responses
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-share-token`,
         {
-          body: { token, passcode: providedPasscode },
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ token, passcode: providedPasscode }),
         }
       );
 
-      if (invokeError) {
-        throw new Error(invokeError.message);
-      }
+      const responseData = await response.json();
 
+      // Handle passcode required (401 with requiresPasscode flag)
       if (responseData.requiresPasscode) {
         setState("passcode");
         setIsSubmitting(false);
         return;
       }
 
+      // Handle errors from the edge function
       if (responseData.error) {
         setError(responseData.error);
         setState("error");
@@ -88,6 +93,7 @@ export default function SharedViewPage() {
         return;
       }
 
+      // Success case
       if (responseData.success) {
         setData(responseData);
         setState("success");
