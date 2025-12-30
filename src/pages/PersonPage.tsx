@@ -29,8 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ShareLinkDialog } from "@/components/ShareLinkDialog";
-import { SharedLinksSection } from "@/components/SharedLinksSection";
 
 interface PersonFinancials {
   id: string;
@@ -354,7 +352,7 @@ export default function PersonPage() {
             Back to Dashboard
           </Button>
 
-          <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold text-foreground mb-2">
                 {person.name}
@@ -393,22 +391,16 @@ export default function PersonPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <ShareLinkDialog personId={person.id} personName={person.name} />
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground mb-1">
-                  Grand Total
-                </div>
-                <div className="text-4xl font-bold text-primary">
-                  {formatCurrency(person.grand_total)}
-                </div>
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground mb-1">
+                Grand Total
+              </div>
+              <div className="text-4xl font-bold text-primary">
+                {formatCurrency(person.grand_total)}
               </div>
             </div>
           </div>
         </div>
-
-        {/* Shared Links Section */}
-        <SharedLinksSection personId={id!} />
 
         {/* Cigarettes Section */}
         <Card className="p-6 mb-6">
