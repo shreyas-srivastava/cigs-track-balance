@@ -30,6 +30,7 @@ interface PersonFinancials {
   eff_price_per_cig: number;
   cig_total: number;
   loans_total: number;
+  repayments_total: number;
   grand_total: number;
 }
 
@@ -126,9 +127,26 @@ const Index = () => {
       )
       .subscribe();
 
+    const repaymentsChannel = supabase
+      .channel("repayments-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "repayments",
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["people-financials"] });
+          queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(peopleChannel);
       supabase.removeChannel(eventsChannel);
+      supabase.removeChannel(repaymentsChannel);
     };
   }, [queryClient]);
 
@@ -194,7 +212,8 @@ const Index = () => {
                 grand_total:
                   (person.cig_count + 1) *
                   (person.price_per_cig ?? settings?.default_price ?? 12) +
-                  person.loans_total,
+                  person.loans_total -
+                  person.repayments_total,
               }
             : person
         )
@@ -240,7 +259,8 @@ const Index = () => {
                 grand_total:
                   (person.cig_count - 1) *
                   (person.price_per_cig ?? settings?.default_price ?? 12) +
-                  person.loans_total,
+                  person.loans_total -
+                  person.repayments_total,
               }
             : person
         )

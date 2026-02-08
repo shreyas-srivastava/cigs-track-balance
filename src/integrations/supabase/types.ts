@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_logs: {
+        Row: {
+          accessed_at: string
+          id: string
+          ip_address: string | null
+          share_link_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          accessed_at?: string
+          id?: string
+          ip_address?: string | null
+          share_link_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          accessed_at?: string
+          id?: string
+          ip_address?: string | null
+          share_link_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_logs_share_link_id_fkey"
+            columns: ["share_link_id"]
+            isOneToOne: false
+            referencedRelation: "share_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string | null
@@ -122,6 +154,51 @@ export type Database = {
         }
         Relationships: []
       }
+      repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          is_deleted: boolean
+          note: string | null
+          person_id: string
+          repayment_date: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          note?: string | null
+          person_id: string
+          repayment_date?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_deleted?: boolean
+          note?: string | null
+          person_id?: string
+          repayment_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repayments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repayments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "v_person_financials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           default_price: number
@@ -139,6 +216,66 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      share_links: {
+        Row: {
+          access_count: number
+          allow_export: boolean
+          created_at: string
+          expires_at: string
+          id: string
+          label: string | null
+          last_accessed_at: string | null
+          mask_sensitive: boolean
+          passcode_hash: string | null
+          person_id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          access_count?: number
+          allow_export?: boolean
+          created_at?: string
+          expires_at: string
+          id?: string
+          label?: string | null
+          last_accessed_at?: string | null
+          mask_sensitive?: boolean
+          passcode_hash?: string | null
+          person_id: string
+          status?: string
+          token: string
+        }
+        Update: {
+          access_count?: number
+          allow_export?: boolean
+          created_at?: string
+          expires_at?: string
+          id?: string
+          label?: string | null
+          last_accessed_at?: string | null
+          mask_sensitive?: boolean
+          passcode_hash?: string | null
+          person_id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "v_person_financials"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -160,6 +297,7 @@ export type Database = {
           loans_total: number | null
           name: string | null
           price_per_cig: number | null
+          repayments_total: number | null
         }
         Relationships: []
       }
