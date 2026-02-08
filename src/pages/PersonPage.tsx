@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Plus, Minus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Minus, Trash2, Wallet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,6 +38,7 @@ interface PersonFinancials {
   eff_price_per_cig: number;
   cig_total: number;
   loans_total: number;
+  repayments_total: number;
   grand_total: number;
 }
 
@@ -57,6 +58,15 @@ interface Loan {
   is_deleted: boolean;
 }
 
+interface Repayment {
+  id: string;
+  amount: number;
+  repayment_date: string;
+  note: string | null;
+  created_at: string;
+  is_deleted: boolean;
+}
+
 export default function PersonPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -64,10 +74,15 @@ export default function PersonPage() {
   const queryClient = useQueryClient();
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [deleteLoanId, setDeleteLoanId] = useState<string | null>(null);
+  const [deleteRepaymentId, setDeleteRepaymentId] = useState<string | null>(null);
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
   const [loanAmount, setLoanAmount] = useState("");
   const [loanDate, setLoanDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [loanReason, setLoanReason] = useState("");
+  const [isAddRepaymentOpen, setIsAddRepaymentOpen] = useState(false);
+  const [repaymentAmount, setRepaymentAmount] = useState("");
+  const [repaymentDate, setRepaymentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [repaymentNote, setRepaymentNote] = useState("");
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState("");
 
@@ -142,6 +157,23 @@ export default function PersonPage() {
     enabled: !!id,
   });
 
+  // Fetch repayments
+  const { data: repayments = [] } = useQuery({
+    queryKey: ["person-repayments", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("repayments")
+        .select("*")
+        .eq("person_id", id)
+        .eq("is_deleted", false)
+        .order("repayment_date", { ascending: false });
+
+      if (error) throw error;
+      return data as Repayment[];
+    },
+    enabled: !!id,
+  });
+
   // Real-time subscriptions
   useEffect(() => {
     if (!id) return;
@@ -180,9 +212,27 @@ export default function PersonPage() {
       )
       .subscribe();
 
+    const repaymentsChannel = supabase
+      .channel("person-repayments-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "repayments",
+          filter: `person_id=eq.${id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["person-repayments", id] });
+          queryClient.invalidateQueries({ queryKey: ["person-financials", id] });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(eventsChannel);
       supabase.removeChannel(loansChannel);
+      supabase.removeChannel(repaymentsChannel);
     };
   }, [id, queryClient]);
 
@@ -270,6 +320,45 @@ export default function PersonPage() {
     },
   });
 
+  // Add repayment mutation
+  const addRepaymentMutation = useMutation({
+    mutationFn: async (repayment: { amount: number; repayment_date: string; note: string | null }) => {
+      const { error } = await supabase.from("repayments").insert({
+        person_id: id!,
+        ...repayment,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["person-repayments", id] });
+      queryClient.invalidateQueries({ queryKey: ["person-financials", id] });
+      queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
+      toast({ title: "Repayment recorded successfully" });
+      setIsAddRepaymentOpen(false);
+      setRepaymentAmount("");
+      setRepaymentDate(format(new Date(), "yyyy-MM-dd"));
+      setRepaymentNote("");
+    },
+  });
+
+  // Delete repayment mutation
+  const deleteRepaymentMutation = useMutation({
+    mutationFn: async (repaymentId: string) => {
+      const { error } = await supabase
+        .from("repayments")
+        .update({ is_deleted: true })
+        .eq("id", repaymentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["person-repayments", id] });
+      queryClient.invalidateQueries({ queryKey: ["person-financials", id] });
+      queryClient.invalidateQueries({ queryKey: ["global-receivable"] });
+      toast({ title: "Repayment deleted" });
+      setDeleteRepaymentId(null);
+    },
+  });
+
   // Update price mutation
   const updatePriceMutation = useMutation({
     mutationFn: async (price: number | null) => {
@@ -310,6 +399,24 @@ export default function PersonPage() {
     });
   };
 
+  const handleAddRepayment = () => {
+    const amount = parseFloat(repaymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addRepaymentMutation.mutate({
+      amount,
+      repayment_date: repaymentDate,
+      note: repaymentNote || null,
+    });
+  };
+
   const handleDeleteEvent = (eventId: string) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
@@ -337,6 +444,7 @@ export default function PersonPage() {
   }
 
   const effectivePrice = person.price_per_cig ?? settings?.default_price ?? 12;
+  const totalOwed = person.cig_total + person.loans_total;
 
   return (
     <div className="min-h-screen bg-background">
@@ -393,13 +501,38 @@ export default function PersonPage() {
 
             <div className="text-right">
               <div className="text-sm text-muted-foreground mb-1">
-                Grand Total
+                Pending Amount
               </div>
               <div className="text-4xl font-bold text-primary">
                 {formatCurrency(person.grand_total)}
               </div>
+              {person.repayments_total > 0 && (
+                <div className="text-sm text-muted-foreground mt-1">
+                  Total: {formatCurrency(totalOwed)} − Paid: {formatCurrency(person.repayments_total)}
+                </div>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="p-4">
+            <div className="text-sm text-muted-foreground">Cigarettes</div>
+            <div className="text-xl font-bold">{formatCurrency(person.cig_total)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-sm text-muted-foreground">Loans</div>
+            <div className="text-xl font-bold">{formatCurrency(person.loans_total)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-sm text-success">Repaid</div>
+            <div className="text-xl font-bold text-success">{formatCurrency(person.repayments_total)}</div>
+          </Card>
+          <Card className="p-4 border-primary/30 bg-primary/5">
+            <div className="text-sm text-primary font-medium">Pending</div>
+            <div className="text-xl font-bold text-primary">{formatCurrency(person.grand_total)}</div>
+          </Card>
         </div>
 
         {/* Cigarettes Section */}
@@ -426,13 +559,6 @@ export default function PersonPage() {
               >
                 <Plus className="h-4 w-4" />
               </Button>
-            </div>
-          </div>
-
-          <div className="text-right mb-4">
-            <div className="text-sm text-muted-foreground">Cigarettes Total</div>
-            <div className="text-2xl font-bold text-primary">
-              {formatCurrency(person.cig_total)}
             </div>
           </div>
 
@@ -477,7 +603,7 @@ export default function PersonPage() {
         </Card>
 
         {/* Loans Section */}
-        <Card className="p-6">
+        <Card className="p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-semibold">Loans</h2>
             <Dialog open={isAddLoanOpen} onOpenChange={setIsAddLoanOpen}>
@@ -577,6 +703,112 @@ export default function PersonPage() {
           </div>
         </Card>
 
+        {/* Repayments Section */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-semibold flex items-center gap-2">
+              <Wallet className="h-6 w-6 text-success" />
+              Repayments
+            </h2>
+            <Dialog open={isAddRepaymentOpen} onOpenChange={setIsAddRepaymentOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2 border-success/50 text-success hover:bg-success/10 hover:text-success">
+                  <Plus className="h-4 w-4" />
+                  Add Repayment
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Record Repayment</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="repayment-amount">Amount (₹)</Label>
+                    <Input
+                      id="repayment-amount"
+                      type="number"
+                      step="0.01"
+                      value={repaymentAmount}
+                      onChange={(e) => setRepaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="repayment-date">Date</Label>
+                    <Input
+                      id="repayment-date"
+                      type="date"
+                      value={repaymentDate}
+                      onChange={(e) => setRepaymentDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="repayment-note">Note (optional)</Label>
+                    <Textarea
+                      id="repayment-note"
+                      value={repaymentNote}
+                      onChange={(e) => setRepaymentNote(e.target.value)}
+                      placeholder="e.g., Partial payment via UPI"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddRepayment} className="bg-success hover:bg-success/90 text-success-foreground">
+                    Record Repayment
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="text-right mb-4">
+            <div className="text-sm text-muted-foreground">Total Repaid</div>
+            <div className="text-2xl font-bold text-success">
+              {formatCurrency(person.repayments_total)}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {repayments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No repayments yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {repayments.map((repayment) => (
+                  <div
+                    key={repayment.id}
+                    className="flex items-center justify-between p-3 border border-success/20 bg-success/5 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="font-semibold text-success">
+                          {formatCurrency(repayment.amount)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {format(new Date(repayment.repayment_date), "PP")}
+                        </div>
+                      </div>
+                      {repayment.note && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {repayment.note}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDeleteRepaymentId(repayment.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+
         {/* Delete Event Confirmation */}
         <AlertDialog
           open={!!deleteEventId}
@@ -617,6 +849,29 @@ export default function PersonPage() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteLoanId && deleteLoanMutation.mutate(deleteLoanId)}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Repayment Confirmation */}
+        <AlertDialog
+          open={!!deleteRepaymentId}
+          onOpenChange={() => setDeleteRepaymentId(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Repayment?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete this repayment entry and update the pending amount.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteRepaymentId && deleteRepaymentMutation.mutate(deleteRepaymentId)}
               >
                 Delete
               </AlertDialogAction>

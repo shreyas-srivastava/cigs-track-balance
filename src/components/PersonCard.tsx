@@ -15,6 +15,7 @@ interface PersonCardProps {
     eff_price_per_cig: number;
     cig_total: number;
     loans_total: number;
+    repayments_total: number;
     grand_total: number;
   };
   onIncrement: (id: string) => void;
@@ -122,9 +123,15 @@ export function PersonCard({
             <span className="text-sm text-muted-foreground">Loans</span>
             <span className="font-semibold tabular-nums">{formatCurrency(person.loans_total)}</span>
           </div>
+          {person.repayments_total > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-success">Repaid</span>
+              <span className="font-semibold tabular-nums text-success">−{formatCurrency(person.repayments_total)}</span>
+            </div>
+          )}
           <Separator className="my-2" />
           <div className="flex justify-between items-center">
-            <span className="font-semibold">Grand Total</span>
+            <span className="font-semibold">Pending</span>
             <span className="text-2xl font-heading font-bold text-primary tabular-nums">
               {formatCurrency(person.grand_total)}
             </span>
